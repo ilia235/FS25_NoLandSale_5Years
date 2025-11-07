@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modDesc descVersion="104">
+    <title>NoLandSale</title>
+    <description>Заборона продажу куплених ділянок протягом 5 років</description>
+    <author>ilia235_1</author>
+    <version>1.0.0.0</version>
+    <iconFilename>icon.dds</iconFilename>
+
+    <scriptFiles>
+        <scriptFile>scripts/NoLandSale.lua</scriptFile>
+    </scriptFiles>
+
+    <extraSourceFiles>
+        <sourceFile>scripts/NoLandSale.lua</sourceFile>
+    </extraSourceFiles>
+
+    <multiplayer supported="true"/>
+</modDesc>
