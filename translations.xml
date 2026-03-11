@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<translations>
+    <texts>
+        <text name="mod_title">
+            <en>No Land Sale - 5 Years</en>
+            <uk>Заборона продажу землі - 5 років</uk>
+        </text>
+        <text name="mod_description">
+            <en>Prevents selling land parcels for a configurable number of game years (1-5 years).</en>
+            <uk>Забороняє продаж земельних ділянок протягом налаштовуваної кількості ігрових років (1-5 років).</uk>
+        </text>
+        <text name="blocked_message">
+            <en>Land sale is blocked! You must wait %d more year(s) before selling land.</en>
+            <uk>Продаж землі заблоковано! Потрібно почекати ще %d рік(ів) перед продажем землі.</uk>
+        </text>
+        <text name="config_title">
+            <en>Blocked Years</en>
+            <uk>Зараховані роки</uk>
+        </text>
+        <text name="config_description">
+            <en>Number of years land sale is blocked (1-5):</en>
+            <uk>Кількість років, на яку заблоковано продаж землі (1-5):</uk>
+        </text>
+    </texts>
+</translations>
