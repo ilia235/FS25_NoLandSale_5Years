@@ -1,35 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?>
-<modDesc descVersion="106">
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="92">
     <author>ilia235_1</author>
     <version>1.0.0.0</version>
+    
     <title>
         <en>No Land Sale - 5 Years</en>
         <uk>Заборона продажу землі - 5 років</uk>
     </title>
+    
     <description>
-        <en>
-            Prevents selling land parcels for a configurable number of game years (1-5 years).
-            
-            Configuration (in modSettings.xml):
-            - Set blockedYears to 1-5 to configure the blocking period.
-            
-            Default: 5 years
-        </en>
-        <uk>
-            Забороняє продаж земельних ділянок протягом налаштовуваної кількості ігрових років (1-5 років).
-            
-            Налаштування (в modSettings.xml):
-            - Встановіть blockedYears від 1 до 5 для налаштування періоду заборони.
-            
-            За замовчуванням: 5 років
-        </uk>
+        <en>Prevents selling land parcels for the first 5 game years. Default: 5 years.</en>
+        <uk>Забороняє продаж земельних ділянок протягом перших 5 ігрових років. За замовчуванням: 5 років.</uk>
     </description>
-	<iconFilename>icon.dds</iconFilename>
+
+    <iconFilename>icon.dds</iconFilename>
+    
+    <multiplayer supported="true"/>
+
     <extraSourceFiles>
         <sourceFile filename="NoLandSale5Years.lua" />
     </extraSourceFiles>
+
     <translations>
         <translation file="translations.xml" />
     </translations>
-	<multiplayer supported="true"/>
 </modDesc>
