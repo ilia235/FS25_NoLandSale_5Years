@@ -25,19 +25,8 @@
         </uk>
     </description>
 	<iconFilename>icon.dds</iconFilename>
-    <configuration>
-        <input>
-            <setting name="blockedYears" 
-                     title="Blocked Years" 
-                     text="Number of years land sale is blocked:" 
-                     type="number" 
-                     default="5" 
-                     minValue="1" 
-                     maxValue="5" />
-        </input>
-    </configuration>
     <extraSourceFiles>
-        <sourceFile filename="scripts/NoLandSale5Years.lua" />
+        <sourceFile filename="NoLandSale5Years.lua" />
     </extraSourceFiles>
     <translations>
         <translation file="translations.xml" />
