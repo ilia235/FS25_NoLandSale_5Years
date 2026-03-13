@@ -21,5 +21,9 @@
             <en>Number of years land sale is blocked (1-5):</en>
             <uk>Кількість років, на яку заблоковано продаж землі (1-5):</uk>
         </text>
+        <text name="nls5y_block_message">
+            <en>Sale is blocked! You can sell this land in %d year(s).</en>
+            <uk>Продаж заблоковано! Ви зможете продати цю землю через %d р.</uk>
+        </text>
     </texts>
 </translations>
