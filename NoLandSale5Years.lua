@@ -1,5 +1,5 @@
 -- NoLandSale5Years.lua
--- FS25 - Strict Sale Blocking, Economy Fix, Save System, Multiplayer Sync & UI Blocking
+-- FS25 - Strict Sale Blocking, Economy Fix, Save System, Multiplayer Sync & Config
 
 NoLandSale5Years = {}
 local NoLandSale5Years_mt = { __index = NoLandSale5Years }
@@ -12,7 +12,6 @@ function NoLandSale5Years.new()
     self.blockedYears = NoLandSale5Years.defaultBlockedYears
     self.purchaseData = {}
     self.isInitialized = false
-    self.isAdminAction = false 
     print(string.format("[%s] Instance created.", NoLandSale5Years.modName))
     return self
 end
@@ -22,41 +21,52 @@ function NoLandSale5Years:print(level, message, ...)
 end
 
 -- =============================================================================
--- Admin Access Checker (ОНОВЛЕНО: Жорсткий фільтр для Соло та Звичайного МП)
+-- Configuration System (modSettings/NoLandSale5Years/config.xml)
 -- =============================================================================
 
-function NoLandSale5Years:isAdmin(connection)
-    -- ГЛОБАЛЬНЕ ПРАВИЛО: Якщо це одиночна гра (соло) — адмінів немає, продаж заборонено всім.
-    if g_currentMission ~= nil and g_currentMission.missionDynamicInfo ~= nil then
-        if not g_currentMission.missionDynamicInfo.isMultiplayer then
-            return false
-        end
+function NoLandSale5Years:loadConfiguration()
+    local modSettingsDir = getUserProfileAppPath() .. "modSettings/"
+    local myModDir = modSettingsDir .. self.modName .. "/"
+    local xmlFilePath = myModDir .. "config.xml"
+
+    self:print("INFO", "--- CONFIGURATION CHECK ---")
+    self:print("INFO", "Looking for config file at: %s", xmlFilePath)
+
+    if not fileExists(modSettingsDir) then
+        createFolder(modSettingsDir)
+    end
+    if not fileExists(myModDir) then
+        createFolder(myModDir)
     end
 
-    -- 1. Перевірка транзакції на сервері (коли гравець тисне "Продати")
-    if g_server ~= nil and connection ~= nil then
-        -- ЖОРСТКИЙ ФІЛЬТР: Дозволяємо тільки на ВИДІЛЕНОМУ сервері.
-        -- Якщо це звичайний хост-гравець у мультиплеєрі, йому також буде заборонено.
-        if g_dedicatedServerInfo == nil then
-            return false 
+    if not fileExists(xmlFilePath) then
+        self:print("WARNING", "Config file NOT FOUND! Creating a new default config.xml...")
+        local xmlFile = createXMLFile("NoLandSaleConfig", xmlFilePath, "noLandSale")
+        if xmlFile ~= 0 then
+            setXMLInt(xmlFile, "noLandSale.blockedYears", self.defaultBlockedYears)
+            saveXMLFile(xmlFile)
+            delete(xmlFile)
+            self:print("INFO", "Created default config.xml with %d years.", self.defaultBlockedYears)
+        else
+            self:print("ERROR", "Failed to create config.xml! Check folder permissions.")
         end
-
-        -- Якщо ми точно на виділеному сервері, перевіряємо, чи ввів гравець пароль адміна
-        if type(connection.getIsMasterUser) == "function" then
-            return connection:getIsMasterUser()
-        elseif g_currentMission.userManager ~= nil and type(g_currentMission.userManager.getIsConnectionMasterUser) == "function" then
-            return g_currentMission.userManager:getIsConnectionMasterUser(connection)
+    else
+        self:print("INFO", "Config file FOUND. Trying to read...")
+        local xmlFile = loadXMLFile("NoLandSaleConfig", xmlFilePath)
+        if xmlFile ~= 0 then
+            local customYears = getXMLInt(xmlFile, "noLandSale.blockedYears")
+            if customYears ~= nil then
+                self.blockedYears = math.max(0, customYears)
+                self:print("INFO", "SUCCESS: Applied custom years from config: %d", self.blockedYears)
+            else
+                self:print("ERROR", "Failed to find 'noLandSale.blockedYears' tag! Check XML structure. Using default: %d", self.blockedYears)
+            end
+            delete(xmlFile)
+        else
+            self:print("ERROR", "XML Syntax Error! The file config.xml is broken. Using default: %d", self.blockedYears)
         end
-        return false
     end
-    
-    -- 2. Локальна клієнтська перевірка (викликається для відображення UI кнопок на карті)
-    if g_currentMission ~= nil then
-        -- Кнопка розблокується лише якщо гравець залогінився як адмін у мультиплеєрі
-        return g_currentMission.isMasterUser == true
-    end
-    
-    return false
+    self:print("INFO", "--- CONFIGURATION END ---")
 end
 
 -- =============================================================================
@@ -103,7 +113,7 @@ function NoLandSale5Years:onSavegameSave()
     
     saveXMLFile(xmlFile)
     delete(xmlFile)
-    self:print("INFO", "Дані збережено. Записів: %d", i)
+    self:print("INFO", "Data saved successfully.")
 end
 
 function NoLandSale5Years:loadFromSavegame()
@@ -130,16 +140,17 @@ function NoLandSale5Years:loadFromSavegame()
             i = i + 1
         end
         delete(xmlFile)
-        self:print("INFO", "Завантажено %d записів з файлу збереження.", i)
+        self:print("INFO", "Loaded %d records from savegame.", i)
     end
 end
 
 -- =============================================================================
--- Multiplayer Synchronization
+-- Multiplayer Synchronization (Network Streams)
 -- =============================================================================
 
 function NoLandSale5Years:onWriteStream(streamId, connection)
     if not connection:GetIsServer() then 
+        streamWriteInt32(streamId, self.blockedYears)
         local count = 0
         for _ in pairs(self.purchaseData) do count = count + 1 end
         
@@ -148,12 +159,13 @@ function NoLandSale5Years:onWriteStream(streamId, connection)
             streamWriteInt32(streamId, id)
             streamWriteInt32(streamId, year)
         end
-        self:print("INFO", "Синхронізація: Відправлено %d записів клієнту.", count)
+        self:print("INFO", "Sync: Sent config (%d years) and %d records to client.", self.blockedYears, count)
     end
 end
 
 function NoLandSale5Years:onReadStream(streamId, connection)
     if connection:GetIsServer() then
+        self.blockedYears = streamReadInt32(streamId)
         self.purchaseData = {}
         local count = streamReadInt32(streamId)
         
@@ -162,7 +174,7 @@ function NoLandSale5Years:onReadStream(streamId, connection)
             local year = streamReadInt32(streamId)
             self.purchaseData[id] = year
         end
-        self:print("INFO", "Синхронізація: Отримано %d записів від сервера.", count)
+        self:print("INFO", "Sync: Received config (%d years) and %d records from server.", self.blockedYears, count)
     end
 end
 
@@ -172,71 +184,45 @@ end
 
 function NoLandSale5Years:init()
     if self.isInitialized or FarmlandManager == nil then return end
-    
-    self.isAdminAction = false 
 
-    -- ХУК 1: Мережева подія (Перевірка перед продажем)
+    self:loadConfiguration()
+    
     if FarmlandStateEvent ~= nil and FarmlandStateEvent.run ~= nil then
         local oldEventRun = FarmlandStateEvent.run
         FarmlandStateEvent.run = function(eventSelf, connection)
             if eventSelf.farmId == 0 then 
-                
-                local hasAdminRights = false
-                if g_server ~= nil then
-                    hasAdminRights = self:isAdmin(connection)
-                else
-                    hasAdminRights = self:isAdmin()
-                end
-
-                if hasAdminRights then
-                    self.isAdminAction = true 
-                    self:print("INFO", "Дозвіл на продаж: Користувач є адміністратором виділеного сервера.")
-                else
-                    local canSell, _ = self:canSellFarmland(eventSelf.farmlandId)
-                    if not canSell then
-                        self:print("WARNING", "Спроба продажу відхилена: Земля заблокована, немає прав.")
-                        return 
-                    end
-                end
+                local canSell, _ = self:canSellFarmland(eventSelf.farmlandId)
+                if not canSell then return end
             end
-            
-            local result = oldEventRun(eventSelf, connection)
-            self.isAdminAction = false 
-            return result
+            return oldEventRun(eventSelf, connection)
         end
     end
 
-    -- ХУК 2: Відкат транзакцій (Логіка менеджера)
     local oldSetLandOwnership = FarmlandManager.setLandOwnership
     FarmlandManager.setLandOwnership = function(manager, farmlandId, farmId, ...)
         local oldOwnerId = manager:getFarmlandOwner(farmlandId)
         
         if farmId == 0 and oldOwnerId ~= 0 then
-            self:print("DEBUG", "Спроба зміни власності. ID землі: %d. Статус адмін-дії: %s", farmlandId, tostring(self.isAdminAction))
+            local canSell, _ = self:canSellFarmland(farmlandId)
             
-            if not self.isAdminAction then
-                local canSell, yearsLeft = self:canSellFarmland(farmlandId)
+            if not canSell then
+                local messageTemplate = g_i18n:getText("warning_noLandSaleYet")
+                local message = string.format(messageTemplate, self.blockedYears)
+                g_currentMission:showBlinkingWarning(message, 15000)
                 
-                if not canSell then
-                    local message = string.format("Ви не можете продати цю ділянку ще %d р.", yearsLeft)
-                    g_currentMission:showBlinkingWarning(message, 5000)
-                    
-                    if g_server ~= nil then
-                        local price = 0
-                        if manager.farmlands ~= nil and manager.farmlands[farmlandId] ~= nil then
-                            price = manager.farmlands[farmlandId].price
-                        end
-                        
-                        if price > 0 then
-                            local moneyType = MoneyType and MoneyType.OTHER or 1
-                            g_currentMission:addMoney(-price, oldOwnerId, moneyType, true, true)
-                            self:print("INFO", "Відкат транзакції: Гроші (-%d) списано з балансу ферми.", price)
-                        end
+                if g_server ~= nil then
+                    local price = 0
+                    if manager.farmlands ~= nil and manager.farmlands[farmlandId] ~= nil then
+                        price = manager.farmlands[farmlandId].price
                     end
-                    return false
+                    
+                    if price ~= nil and price > 0 then
+                        local moneyType = MoneyType and MoneyType.OTHER or 1
+                        g_currentMission:addMoney(-price, oldOwnerId, moneyType, true, true)
+                        self:print("INFO", "Transaction rollback: %d deducted from farm balance.", price)
+                    end
                 end
-            else
-                self:print("INFO", "Транзакція дозволена: Адміністратор продає заблоковану землю.")
+                return false
             end
         end
         
@@ -251,61 +237,30 @@ function NoLandSale5Years:init()
                 if g_currentMission and g_currentMission.environment then
                     local currentYear = g_currentMission.environment.currentYear
                     self.purchaseData[farmlandId] = currentYear
-                    self:print("INFO", "Землю %d куплено фермою %d. Блокування на %d років.", farmlandId, farmId, self.blockedYears)
+                    self:print("INFO", "Land %d purchased. Blocked for %d years.", farmlandId, self.blockedYears)
                 end
             elseif farmId == 0 then
                 self.purchaseData[farmlandId] = nil
-                self:print("INFO", "Землю %d успішно продано.", farmlandId)
+                self:print("INFO", "Land %d successfully sold.", farmlandId)
             end
         end
-        
         return result
     end
 
-    -- ХУК 3: ВІЗУАЛЬНИЙ UI-БЛОКУВАЛЬНИК
-    if InGameMenuMapFrame ~= nil and InGameMenuMapFrame.updateFarmlandSelection ~= nil then
-        local oldUpdateFarmlandSelection = InGameMenuMapFrame.updateFarmlandSelection
-        
-        InGameMenuMapFrame.updateFarmlandSelection = function(mapFrameSelf, ...)
-            oldUpdateFarmlandSelection(mapFrameSelf, ...)
-            
-            local farmlandId = mapFrameSelf.selectedFarmlandId or mapFrameSelf.hoveredFarmlandId
-            if farmlandId ~= nil and farmlandId ~= 0 then
-                
-                local ownerId = g_farmlandManager:getFarmlandOwner(farmlandId)
-                local myFarmId = g_currentMission:getFarmId()
-                
-                if ownerId == myFarmId and ownerId ~= 0 then
-                    local canSell, _ = self:canSellFarmland(farmlandId)
-                    
-                    local isClientAdmin = self:isAdmin()
-                    
-                    if not canSell and not isClientAdmin then
-                        if mapFrameSelf.actionBuySellFarmland ~= nil then
-                            mapFrameSelf:setButtonState(mapFrameSelf.actionBuySellFarmland, true, false)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    if g_server ~= nil then
-        self:loadFromSavegame()
-    end
+    if g_server ~= nil then self:loadFromSavegame() end
     
     self.isInitialized = true
-    self:print("INFO", "Мод ініціалізовано. UI-блокування та захист адміна працюють.")
+    self:print("INFO", "Mod initialized. Multiplayer and economy protection enabled.")
 end
 
 g_noLandSaleInstance = NoLandSale5Years.new()
 
 function NoLandSale5Years:loadMap(name)
-    g_noLandSaleInstance:init()
+    self:init()
 end
 
 function NoLandSale5Years:saveSavegame()
-    g_noLandSaleInstance:onSavegameSave()
+    self:onSavegameSave()
 end
 
 addModEventListener(g_noLandSaleInstance)

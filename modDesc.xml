@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="104">
     <author>ilia235_1</author>
-    <version>1.0.0.2</version>
+    <version>1.1.0.0</version>
     
     <title>
         <en>No Land Sale - 5 Years</en>
         <uk>Заборона продажу землі - 5 років</uk>
         <de>Kein Grundstücksverkauf – 5 Jahre</de>
+        <fr>Pas de vente de terrain - 5 ans</fr>
     </title>
     
     <description>
-        <en>Prevents selling land parcels for the first 5 game years. Default: 5 years.</en>
-        <uk>Забороняє продаж земельних ділянок протягом перших 5 ігрових років. За замовчуванням: 5 років.</uk>
-        <de>Verhindert den Verkauf von Grundstücken für die ersten 5 Spieljahre. Standard: 5 Jahre.</de>
+        <en>Prevents selling land parcels for a set amount of game years. Configurable via modSettings! Default: 5 years.</en>
+        <uk>Забороняє продаж земельних ділянок протягом заданої кількості років. Налаштовується через modSettings! За замовчуванням: 5 років.</uk>
+        <de>Verhindert den Verkauf von Grundstücken für eine festgelegte Anzahl von Spieljahren. Konfigurierbar über modSettings! Standard: 5 Jahre.</de>
+        <fr>Empêche la vente de parcelles de terrain pendant un nombre défini d'années de jeu. Configurable via modSettings ! Par défaut : 5 ans.</fr>
     </description>
 
-    <iconFilename>icon.dds</iconFilename>
+    <iconFilename>icon_NoLandSale5Years.dds</iconFilename>
     
     <multiplayer supported="true"/>
 
@@ -23,7 +25,12 @@
         <sourceFile filename="NoLandSale5Years.lua" />
     </extraSourceFiles>
 
-    <translations>
-        <translation file="translations.xml" />
-    </translations>
+    <l10n>
+        <text name="warning_noLandSaleYet">
+            <en>You cannot sell land during the first %d years!</en>
+            <uk>Ви не можете продавати землю протягом перших %d років!</uk>
+            <de>Sie koennen in den ersten %d Jahren kein Land verkaufen!</de>
+            <fr>Vous ne pouvez pas vendre de terres pendant les %d premieres annees !</fr>
+        </text>
+    </l10n>
 </modDesc>
