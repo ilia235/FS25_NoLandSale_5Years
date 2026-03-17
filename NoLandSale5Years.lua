@@ -7,6 +7,60 @@ local NoLandSale5Years_mt = { __index = NoLandSale5Years }
 NoLandSale5Years.modName = "NoLandSale5Years"
 NoLandSale5Years.defaultBlockedYears = 5
 
+-- =============================================================================
+-- NETWORK SYNC EVENT (Примусова синхронізація клієнта з сервером)
+-- =============================================================================
+
+NoLandSaleSyncEvent = {}
+local NoLandSaleSyncEvent_mt = Class(NoLandSaleSyncEvent, Event)
+InitEventClass(NoLandSaleSyncEvent, "NoLandSaleSyncEvent")
+
+function NoLandSaleSyncEvent.emptyNew()
+    return Event.new(NoLandSaleSyncEvent_mt)
+end
+
+function NoLandSaleSyncEvent.new(blockedYears, purchaseData)
+    local self = NoLandSaleSyncEvent.emptyNew()
+    self.blockedYears = blockedYears
+    self.purchaseData = purchaseData
+    return self
+end
+
+function NoLandSaleSyncEvent:readStream(streamId, connection)
+    self.blockedYears = streamReadInt32(streamId)
+    self.purchaseData = {}
+    local count = streamReadInt32(streamId)
+    for i = 1, count do
+        local id = streamReadInt32(streamId)
+        local year = streamReadInt32(streamId)
+        self.purchaseData[id] = year
+    end
+    self:run(connection)
+end
+
+function NoLandSaleSyncEvent:writeStream(streamId, connection)
+    streamWriteInt32(streamId, self.blockedYears)
+    local count = 0
+    for _ in pairs(self.purchaseData) do count = count + 1 end
+    streamWriteInt32(streamId, count)
+    for id, year in pairs(self.purchaseData) do
+        streamWriteInt32(streamId, id)
+        streamWriteInt32(streamId, year)
+    end
+end
+
+function NoLandSaleSyncEvent:run(connection)
+    if g_noLandSaleInstance ~= nil then
+        g_noLandSaleInstance.blockedYears = self.blockedYears
+        g_noLandSaleInstance.purchaseData = self.purchaseData
+        g_noLandSaleInstance:print("INFO", "Sync successful! Client updated blockedYears to %d", self.blockedYears)
+    end
+end
+
+-- =============================================================================
+-- MAIN CLASS
+-- =============================================================================
+
 function NoLandSale5Years.new()
     local self = setmetatable({}, NoLandSale5Years_mt)
     self.blockedYears = NoLandSale5Years.defaultBlockedYears
@@ -20,10 +74,6 @@ function NoLandSale5Years:print(level, message, ...)
     print(string.format("[%s][%s] %s", self.modName, level, string.format(message, ...)))
 end
 
--- =============================================================================
--- Configuration System (modSettings/NoLandSale5Years/config.xml)
--- =============================================================================
-
 function NoLandSale5Years:loadConfiguration()
     local modSettingsDir = getUserProfileAppPath() .. "modSettings/"
     local myModDir = modSettingsDir .. self.modName .. "/"
@@ -32,12 +82,8 @@ function NoLandSale5Years:loadConfiguration()
     self:print("INFO", "--- CONFIGURATION CHECK ---")
     self:print("INFO", "Looking for config file at: %s", xmlFilePath)
 
-    if not fileExists(modSettingsDir) then
-        createFolder(modSettingsDir)
-    end
-    if not fileExists(myModDir) then
-        createFolder(myModDir)
-    end
+    if not fileExists(modSettingsDir) then createFolder(modSettingsDir) end
+    if not fileExists(myModDir) then createFolder(myModDir) end
 
     if not fileExists(xmlFilePath) then
         self:print("WARNING", "Config file NOT FOUND! Creating a new default config.xml...")
@@ -47,8 +93,6 @@ function NoLandSale5Years:loadConfiguration()
             saveXMLFile(xmlFile)
             delete(xmlFile)
             self:print("INFO", "Created default config.xml with %d years.", self.defaultBlockedYears)
-        else
-            self:print("ERROR", "Failed to create config.xml! Check folder permissions.")
         end
     else
         self:print("INFO", "Config file FOUND. Trying to read...")
@@ -59,27 +103,18 @@ function NoLandSale5Years:loadConfiguration()
                 self.blockedYears = math.max(0, customYears)
                 self:print("INFO", "SUCCESS: Applied custom years from config: %d", self.blockedYears)
             else
-                self:print("ERROR", "Failed to find 'noLandSale.blockedYears' tag! Check XML structure. Using default: %d", self.blockedYears)
+                self:print("ERROR", "Failed to find 'noLandSale.blockedYears' tag! Using default: %d", self.blockedYears)
             end
             delete(xmlFile)
-        else
-            self:print("ERROR", "XML Syntax Error! The file config.xml is broken. Using default: %d", self.blockedYears)
         end
     end
     self:print("INFO", "--- CONFIGURATION END ---")
 end
 
--- =============================================================================
--- Core Logic
--- =============================================================================
-
 function NoLandSale5Years:canSellFarmland(farmlandId)
     local purchaseYear = self.purchaseData[farmlandId]
     if purchaseYear == nil then return true, 0 end
-
-    if g_currentMission == nil or g_currentMission.environment == nil then 
-        return true, 0 
-    end
+    if g_currentMission == nil or g_currentMission.environment == nil then return true, 0 end
 
     local currentYear = g_currentMission.environment.currentYear
     local yearsOwned = currentYear - purchaseYear
@@ -89,10 +124,6 @@ function NoLandSale5Years:canSellFarmland(farmlandId)
     end
     return true, 0
 end
-
--- =============================================================================
--- Save/Load System
--- =============================================================================
 
 function NoLandSale5Years:onSavegameSave()
     if g_currentMission == nil or g_currentMission.missionInfo == nil then return end
@@ -133,7 +164,6 @@ function NoLandSale5Years:loadFromSavegame()
             
             local id = getXMLInt(xmlFile, key .. "#farmlandId")
             local year = getXMLInt(xmlFile, key .. "#year")
-            
             if id ~= nil and year ~= nil then
                 self.purchaseData[id] = year
             end
@@ -144,49 +174,23 @@ function NoLandSale5Years:loadFromSavegame()
     end
 end
 
--- =============================================================================
--- Multiplayer Synchronization (Network Streams)
--- =============================================================================
-
-function NoLandSale5Years:onWriteStream(streamId, connection)
-    if not connection:GetIsServer() then 
-        streamWriteInt32(streamId, self.blockedYears)
-        local count = 0
-        for _ in pairs(self.purchaseData) do count = count + 1 end
-        
-        streamWriteInt32(streamId, count)
-        for id, year in pairs(self.purchaseData) do
-            streamWriteInt32(streamId, id)
-            streamWriteInt32(streamId, year)
-        end
-        self:print("INFO", "Sync: Sent config (%d years) and %d records to client.", self.blockedYears, count)
-    end
-end
-
-function NoLandSale5Years:onReadStream(streamId, connection)
-    if connection:GetIsServer() then
-        self.blockedYears = streamReadInt32(streamId)
-        self.purchaseData = {}
-        local count = streamReadInt32(streamId)
-        
-        for i = 1, count do
-            local id = streamReadInt32(streamId)
-            local year = streamReadInt32(streamId)
-            self.purchaseData[id] = year
-        end
-        self:print("INFO", "Sync: Received config (%d years) and %d records from server.", self.blockedYears, count)
-    end
-end
-
--- =============================================================================
--- Initialization & Safe Hooks
--- =============================================================================
-
 function NoLandSale5Years:init()
     if self.isInitialized or FarmlandManager == nil then return end
 
     self:loadConfiguration()
+
+    -- ХУК 1: Відправка налаштувань сервера гравцям при підключенні
+    local oldSendInitialClientState = FSBaseMission.sendInitialClientState
+    FSBaseMission.sendInitialClientState = function(mission, connection, user, ...)
+        if oldSendInitialClientState ~= nil then
+            oldSendInitialClientState(mission, connection, user, ...)
+        end
+        if g_server ~= nil then
+            connection:sendEvent(NoLandSaleSyncEvent.new(self.blockedYears, self.purchaseData))
+        end
+    end
     
+    -- ХУК 2: Блокування мережевої події (зупиняє клієнтів від відправки запиту на продаж)
     if FarmlandStateEvent ~= nil and FarmlandStateEvent.run ~= nil then
         local oldEventRun = FarmlandStateEvent.run
         FarmlandStateEvent.run = function(eventSelf, connection)
@@ -198,6 +202,7 @@ function NoLandSale5Years:init()
         end
     end
 
+    -- ХУК 3: Відстеження транзакцій + відкат грошей та локальне блокування
     local oldSetLandOwnership = FarmlandManager.setLandOwnership
     FarmlandManager.setLandOwnership = function(manager, farmlandId, farmId, ...)
         local oldOwnerId = manager:getFarmlandOwner(farmlandId)
