@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
-<modDesc descVersion="104">
+<modDesc descVersion="107">
     <author>ilia235_1</author>
-    <version>1.1.0.0</version>
+    <version>1.0.0.0</version>
     
     <title>
         <en>No Land Sale - 5 Years</en>
-        <uk>Заборона продажу землі - 5 років</uk>
+        <uk>Заборона Продажу Землі - 5 Років</uk>
         <de>Kein Grundstücksverkauf – 5 Jahre</de>
-        <fr>Pas de vente de terrain - 5 ans</fr>
+        <fr>Pas De Vente De Terrain - 5 Ans</fr>
     </title>
     
     <description>
-        <en>Prevents selling land parcels for a set amount of game years. Configurable via modSettings! Default: 5 years.</en>
-        <uk>Забороняє продаж земельних ділянок протягом заданої кількості років. Налаштовується через modSettings! За замовчуванням: 5 років.</uk>
-        <de>Verhindert den Verkauf von Grundstücken für eine festgelegte Anzahl von Spieljahren. Konfigurierbar über modSettings! Standard: 5 Jahre.</de>
-        <fr>Empêche la vente de parcelles de terrain pendant un nombre défini d'années de jeu. Configurable via modSettings ! Par défaut : 5 ans.</fr>
+        <en><![CDATA[Prevents selling land parcels for a set amount of game years. Configurable via modSettings! Default: 5 years.]]></en>
+        <uk><![CDATA[Забороняє продаж земельних ділянок протягом заданої кількості років. Налаштовується через modSettings! За замовчуванням: 5 років.]]></uk>
+        <de><![CDATA[Verhindert den Verkauf von Grundstücken für eine festgelegte Anzahl von Spieljahren. Konfigurierbar über modSettings! Standard: 5 Jahre.]]></de>
+        <fr><![CDATA[Empêche la vente de parcelles de terrain pendant un nombre défini d'années de jeu. Configurable via modSettings ! Par défaut : 5 ans.]]></fr>
     </description>
 
     <iconFilename>icon_NoLandSale5Years.dds</iconFilename>
