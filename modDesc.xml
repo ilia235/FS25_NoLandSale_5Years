@@ -27,10 +27,10 @@
 
     <l10n>
         <text name="warning_noLandSaleYet">
-            <en>You cannot sell land during the first %d years!</en>
-            <uk>Ви не можете продавати землю протягом перших %d років!</uk>
-            <de>Sie koennen in den ersten %d Jahren kein Land verkaufen!</de>
-            <fr>Vous ne pouvez pas vendre de terres pendant les %d premieres annees !</fr>
+            <en>You cannot sell land during the first %d years of ownership!</en>
+            <uk>Ви не можете продавати землю протягом перших %d років володіння!</uk>
+            <de>Sie können in den ersten %d Jahren kein Land verkaufen!</de>
+            <fr>Vous ne pouvez pas vendre de terres pendant les %d premières années !</fr>
         </text>
     </l10n>
 </modDesc>
