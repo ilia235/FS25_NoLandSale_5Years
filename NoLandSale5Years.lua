@@ -5,7 +5,8 @@ NoLandSale5Years = {}
 local NoLandSale5Years_mt = { __index = NoLandSale5Years }
 
 NoLandSale5Years.modName = "NoLandSale5Years"
-NoLandSale5Years.DEFAULT_BLOCKED_YEARS = 5 -- Використовуємо константу
+NoLandSale5Years.DEFAULT_BLOCKED_YEARS = 5
+NoLandSale5Years.MSG_DURATION = 15000 -- 15 секунд показу повідомлення
 
 -- =============================================================================
 -- NETWORK SYNC EVENT
@@ -57,7 +58,7 @@ function NoLandSaleSyncEvent:run(connection)
     if g_noLandSaleInstance ~= nil then
         g_noLandSaleInstance.blockedYears = self.blockedYears
         g_noLandSaleInstance.purchaseData = self.purchaseData
-        g_noLandSaleInstance:print("INFO", "Sync successful! Client updated.")
+        g_noLandSaleInstance:print("INFO", "Синхронізація успішна! Налаштування сервера: %d років.", self.blockedYears)
     end
 end
 
@@ -70,17 +71,15 @@ function NoLandSale5Years.new()
     self.blockedYears = NoLandSale5Years.DEFAULT_BLOCKED_YEARS
     self.purchaseData = {}
     self.isInitialized = false
-
     return self
 end
 
--- Допоміжна функція для логування
 function NoLandSale5Years:print(level, message, ...)
     print(string.format("[%s][%s] %s", self.modName, level, string.format(message, ...)))
 end
 
--- Завантаження налаштувань з XML
 function NoLandSale5Years:loadConfiguration()
+    -- Цей блок виконується переважно на сервері
     local modSettingsDir = getUserProfileAppPath() .. "modSettings/"
     local myModDir = modSettingsDir .. self.modName .. "/"
     local xmlFilePath = myModDir .. "config.xml"
@@ -107,12 +106,8 @@ function NoLandSale5Years:loadConfiguration()
     end
 end
 
--- Перевірка, чи можна продати ділянку
--- @param farmlandId ID ділянки
--- @return boolean (можна продати), number (скільки років залишилось)
 function NoLandSale5Years:canSellFarmland(farmlandId)
     local purchaseYear = self.purchaseData[farmlandId]
-    -- Якщо даних немає, вважаємо, що земля була "завжди" або куплена до встановлення моду
     if purchaseYear == nil then return true, 0 end
 
     if g_currentMission == nil or g_currentMission.environment == nil then
@@ -129,9 +124,8 @@ function NoLandSale5Years:canSellFarmland(farmlandId)
     return true, 0
 end
 
--- Збереження даних у сейвгейм
 function NoLandSale5Years:onSavegameSave()
-    if g_currentMission == nil or g_currentMission.missionInfo == nil then return end
+    if g_currentMission == nil or g_currentMission.missionInfo == nil or g_server == nil then return end
 
     local savegameDir = g_currentMission.missionInfo.savegameDirectory
     if savegameDir == nil then return end
@@ -152,7 +146,6 @@ function NoLandSale5Years:onSavegameSave()
     end
 end
 
--- Завантаження даних із сейвгейму
 function NoLandSale5Years:loadFromSavegame()
     local savegameDir = g_currentMission.missionInfo.savegameDirectory
     if savegameDir == nil then return end
@@ -166,10 +159,8 @@ function NoLandSale5Years:loadFromSavegame()
         while true do
             local key = string.format("noLandSale.purchase(%d)", i)
             if not hasXMLEntry(xmlFile, key) then break end
-
             local id = getXMLInt(xmlFile, key .. "#farmlandId")
             local year = getXMLInt(xmlFile, key .. "#year")
-
             if id ~= nil and year ~= nil then
                 self.purchaseData[id] = year
             end
@@ -182,9 +173,12 @@ end
 function NoLandSale5Years:init()
     if self.isInitialized or FarmlandManager == nil then return end
 
-    self:loadConfiguration()
+    if g_server ~= nil then
+        self:loadConfiguration()
+        self:loadFromSavegame()
+    end
 
-    -- ХУК: Синхронізація при підключенні (безпечний метод)
+    -- Синхронізація при вході клієнта
     FSBaseMission.registerActionEvents = Utils.appendedFunction(FSBaseMission.registerActionEvents,
         function(mission, connection)
             if g_server ~= nil and connection ~= nil then
@@ -192,57 +186,48 @@ function NoLandSale5Years:init()
             end
         end)
 
-    -- ХУК: Основна логіка володіння
+    -- Головний хук продажу
     local oldSetLandOwnership = FarmlandManager.setLandOwnership
     FarmlandManager.setLandOwnership = function(manager, farmlandId, farmId, ...)
         local oldOwnerId = manager:getFarmlandOwner(farmlandId)
 
-        -- Спроба продажу (власник стає 0)
         if farmId == 0 and oldOwnerId ~= 0 then
             local canSell, yearsLeft = self:canSellFarmland(farmlandId)
 
             if not canSell then
-                -- Виводимо попередження гравцеві
-                local message = string.format("Ви не можете продати цю землю! Потрібно володіти нею ще %d р.", yearsLeft)
-                g_currentMission:showBlinkingWarning(message, 5000)
+                -- ВИПРАВЛЕНО: Використовуємо локалізацію та self.blockedYears (синхронізовані)
+                -- Встановлено час показу 15 секунд (self.MSG_DURATION)
+                local text = string.format(g_i18n:getText("warning_noLandSaleYet"), self.blockedYears)
+                g_currentMission:showBlinkingWarning(text, self.MSG_DURATION)
 
-                -- Повернення грошей на сервері, якщо гра вже встигла їх видати
                 if g_server ~= nil then
                     local farmland = manager:getFarmlandById(farmlandId)
                     if farmland ~= nil and farmland.price > 0 then
-                        -- Вираховуємо ціну назад, оскільки гра додає її при продажу
                         g_currentMission:addMoney(-farmland.price, oldOwnerId, MoneyType.SHOP_PROPERTY_BUY, true, true)
                     end
                 end
-                return false -- Скасовуємо зміну власника
+                return false
             end
         end
 
-        -- Виклик оригінальної функції
         local result = oldSetLandOwnership(manager, farmlandId, farmId, ...)
 
-        -- Фіксуємо дату покупки
         if result and farmId ~= 0 and oldOwnerId == 0 then
             if g_currentMission.environment then
                 self.purchaseData[farmlandId] = g_currentMission.environment.currentYear
-                self:print("INFO", "Земля %d заблокована на %d років", farmlandId, self.blockedYears)
             end
         elseif result and farmId == 0 then
-            -- Видаляємо запис після успішного дозволеного продажу
             self.purchaseData[farmlandId] = nil
         end
 
         return result
     end
 
-    if g_server ~= nil then self:loadFromSavegame() end
     self.isInitialized = true
 end
 
--- Створення екземпляру
 g_noLandSaleInstance = NoLandSale5Years.new()
 
--- Зв'язок з ігровими подіями
 function NoLandSale5Years:loadMap(name)
     self:init()
 end
