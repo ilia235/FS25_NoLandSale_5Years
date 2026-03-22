@@ -9,7 +9,7 @@ local NoLandSale5Years_mt = { __index = NoLandSale5Years }
 
 NoLandSale5Years.modName = "NoLandSale5Years"
 NoLandSale5Years.DEFAULT_BLOCKED_YEARS = 5
-NoLandSale5Years.MSG_DURATION = 15000 -- 15 секунд показу повідомлення
+NoLandSale5Years.MSG_DURATION = 15000
 
 -- =============================================================================
 -- NETWORK SYNC EVENT
@@ -19,28 +19,20 @@ NoLandSaleSyncEvent = {}
 local NoLandSaleSyncEvent_mt = Class(NoLandSaleSyncEvent, Event)
 InitEventClass(NoLandSaleSyncEvent, "NoLandSaleSyncEvent")
 
---- Створює порожній об'єкт події (використовується внутрішніми механізмами гри)
--- @return table Порожній об'єкт події
+-- Creates an empty event object
 function NoLandSaleSyncEvent.emptyNew()
     return Event.new(NoLandSaleSyncEvent_mt)
 end
 
---- Створює нову подію для відправки через мережу
--- @param blockedYears number Кількість років блокування продажу
--- @param purchaseData table Таблиця з даними про купівлю (ID ділянки = рік)
--- @return table Готовий об'єкт події
+-- Creates a new sync event for the network
 function NoLandSaleSyncEvent.new(blockedYears, purchaseData)
     local self = NoLandSaleSyncEvent.emptyNew()
-
     self.blockedYears = blockedYears
     self.purchaseData = purchaseData
-
     return self
 end
 
---- Читає дані з мережевого потоку (виконується на стороні клієнта)
--- @param streamId number ID потоку даних
--- @param connection table Об'єкт мережевого з'єднання
+-- Reads data from the network stream (Client side)
 function NoLandSaleSyncEvent:readStream(streamId, connection)
     self.blockedYears = streamReadInt32(streamId)
     self.purchaseData = {}
@@ -56,9 +48,7 @@ function NoLandSaleSyncEvent:readStream(streamId, connection)
     self:run(connection)
 end
 
---- Записує дані у мережевий потік (виконується на стороні сервера)
--- @param streamId number ID потоку даних
--- @param connection table Об'єкт мережевого з'єднання
+-- Writes data to the network stream (Server side)
 function NoLandSaleSyncEvent:writeStream(streamId, connection)
     streamWriteInt32(streamId, self.blockedYears)
 
@@ -75,13 +65,12 @@ function NoLandSaleSyncEvent:writeStream(streamId, connection)
     end
 end
 
---- Виконує логіку після успішного отримання події клієнтом
--- @param connection table Об'єкт мережевого з'єднання
+-- Executes the event logic after receiving
 function NoLandSaleSyncEvent:run(connection)
     if g_noLandSaleInstance ~= nil then
         g_noLandSaleInstance.blockedYears = self.blockedYears
         g_noLandSaleInstance.purchaseData = self.purchaseData
-        g_noLandSaleInstance:print("INFO", "Синхронізація успішна! Налаштування сервера: %d років.", self.blockedYears)
+        g_noLandSaleInstance:print("INFO", "Sync successful! Server setting: %d years.", self.blockedYears)
     end
 end
 
@@ -89,26 +78,21 @@ end
 -- MAIN CLASS
 -- =============================================================================
 
---- Створює новий екземпляр головного класу мода
--- @return table Екземпляр NoLandSale5Years
+-- Initializes the main mod class
 function NoLandSale5Years.new()
     local self = setmetatable({}, NoLandSale5Years_mt)
-
     self.blockedYears = NoLandSale5Years.DEFAULT_BLOCKED_YEARS
     self.purchaseData = {}
     self.isInitialized = false
-
     return self
 end
 
---- Форматований вивід повідомлень у консоль гри (log.txt)
--- @param level string Рівень повідомлення (INFO, WARNING, ERROR)
--- @param message string Текст повідомлення
+-- Custom print function for the game log
 function NoLandSale5Years:print(level, message, ...)
     print(string.format("[%s][%s] %s", self.modName, level, string.format(message, ...)))
 end
 
---- Завантажує налаштування з папки modSettings або створює файл за замовчуванням
+-- Loads configuration from modSettings folder
 function NoLandSale5Years:loadConfiguration()
     local modSettingsDir = getUserProfileAppPath() .. "modSettings/"
     local myModDir = modSettingsDir .. self.modName .. "/"
@@ -140,10 +124,7 @@ function NoLandSale5Years:loadConfiguration()
     end
 end
 
---- Перевіряє, чи має гравець право продати ділянку землі
--- @param farmlandId number ID ділянки землі
--- @return boolean Чи дозволено продаж
--- @return number Скільки років залишилося до можливості продажу
+-- Checks if the player is allowed to sell the farmland
 function NoLandSale5Years:canSellFarmland(farmlandId)
     local purchaseYear = self.purchaseData[farmlandId]
     if purchaseYear == nil then
@@ -164,7 +145,7 @@ function NoLandSale5Years:canSellFarmland(farmlandId)
     return true, 0
 end
 
---- Зберігає дані про купівлю ділянок у збереження гри
+-- Saves purchase data to the savegame
 function NoLandSale5Years:onSavegameSave()
     if g_currentMission == nil or g_currentMission.missionInfo == nil or g_server == nil then
         return
@@ -191,7 +172,7 @@ function NoLandSale5Years:onSavegameSave()
     end
 end
 
---- Завантажує дані про купівлю ділянок із збереження гри
+-- Loads purchase data from the savegame
 function NoLandSale5Years:loadFromSavegame()
     local savegameDir = g_currentMission.missionInfo.savegameDirectory
     if savegameDir == nil then
@@ -224,7 +205,7 @@ function NoLandSale5Years:loadFromSavegame()
     end
 end
 
---- Ініціалізує мод, встановлює хуки та підписується на події
+-- Initializes the mod and injects the farmland hook
 function NoLandSale5Years:init()
     if self.isInitialized or FarmlandManager == nil then
         return
@@ -235,7 +216,6 @@ function NoLandSale5Years:init()
         self:loadFromSavegame()
     end
 
-    -- Синхронізація при вході клієнта
     FSBaseMission.registerActionEvents = Utils.appendedFunction(FSBaseMission.registerActionEvents,
         function(mission, connection)
             if g_server ~= nil and connection ~= nil then
@@ -243,20 +223,17 @@ function NoLandSale5Years:init()
             end
         end)
 
-    -- Головний хук для перехоплення покупки/продажу землі
     local oldSetLandOwnership = FarmlandManager.setLandOwnership
     FarmlandManager.setLandOwnership = function(manager, farmlandId, farmId, ...)
         local oldOwnerId = manager:getFarmlandOwner(farmlandId)
 
-        -- Якщо farmId == 0, значить ділянку намагаються продати
         if farmId == 0 and oldOwnerId ~= 0 then
-            local canSell, yearsLeft = self:canSellFarmland(farmlandId)
+            local canSell, _ = self:canSellFarmland(farmlandId)
 
             if not canSell then
                 local text = string.format(g_i18n:getText("warning_noLandSaleYet"), self.blockedYears)
                 g_currentMission:showBlinkingWarning(text, self.MSG_DURATION)
 
-                -- Повертаємо гроші, якщо це сервер (гра могла вже списати їх)
                 if g_server ~= nil then
                     local farmland = manager:getFarmlandById(farmlandId)
                     if farmland ~= nil and farmland.price > 0 then
@@ -267,15 +244,12 @@ function NoLandSale5Years:init()
             end
         end
 
-        -- Викликаємо оригінальну функцію
         local result = oldSetLandOwnership(manager, farmlandId, farmId, ...)
 
-        -- Якщо покупка пройшла успішно
         if result and farmId ~= 0 and oldOwnerId == 0 then
             if g_currentMission.environment then
                 self.purchaseData[farmlandId] = g_currentMission.environment.currentYear
             end
-            -- Якщо продаж пройшов успішно (термін сплив)
         elseif result and farmId == 0 then
             self.purchaseData[farmlandId] = nil
         end
@@ -292,12 +266,10 @@ end
 
 g_noLandSaleInstance = NoLandSale5Years.new()
 
---- Викликається грою при завантаженні карти
 function NoLandSale5Years:loadMap(name)
     self:init()
 end
 
---- Викликається грою під час збереження
 function NoLandSale5Years:saveSavegame()
     self:onSavegameSave()
 end
