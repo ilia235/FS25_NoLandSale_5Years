@@ -1,5 +1,6 @@
 # FS25_NoLandSale_5Years
 <img width="512" height="512" alt="image_1_1773475640840" src="https://github.com/user-attachments/assets/349a960e-3d0f-467c-8eb3-9ea65568229d" />
+
 Мод для Farming Simulator 25 на заборону продажу земельних ділянок
 
 Налаштування мода для збільшеня чи зменьшеня терміну блокіровкі продажу.
